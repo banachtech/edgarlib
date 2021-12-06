@@ -1,2 +1,1 @@
-# edgarlib
-edgar python module
+# pythonlib
