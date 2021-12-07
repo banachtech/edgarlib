@@ -309,3 +309,4 @@ def get_overall_rank(value):
         dataframe = dataframe.sort_values(by=['Score', 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sector', 'Score']][:int(value)]
     result = dataframe
     return result
+
