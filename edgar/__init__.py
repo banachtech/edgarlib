@@ -310,3 +310,41 @@ def get_overall_rank(value):
     result = dataframe
     return result
 
+def get_additional_analytics(tickers):
+    # print(request.data)
+    ticker_list = tickers.split(',')
+    # print(ticker_list)
+    data = {}
+
+    for i in ticker_list:
+        data[i] = {}
+        ticker_hist = yf.Ticker(i)
+        
+        hist_1y = ticker_hist.history(period='1y')
+        hist_1y = hist_1y.dropna()
+        hist_1y = hist_1y['Close']
+
+        hist_3mo = ticker_hist.history(period='3mo')
+        hist_3mo = hist_3mo.dropna()
+        hist_3mo = hist_3mo['Close']
+
+        hist_30d = ticker_hist.history(period='30d')
+        hist_30d = hist_30d.dropna()
+        hist_30d = hist_30d[['Close']]
+        hist_30d['Return'] = hist_30d['Close'].rolling(window=2).apply(lambda x: np.log(x[1]/x[0]))
+        hist_30d = hist_30d.dropna()
+        hist_30d = hist_30d['Return']
+        
+        mom12 = round((hist_1y[-1] - hist_1y[0]) / hist_1y[0], 3)
+        mom3 = round((hist_3mo[-1] - hist_3mo[0]) / hist_3mo[0], 3)
+        vol30 = round(np.std(hist_30d) * np.sqrt(252), 3)
+        maxret = round(max(hist_30d), 3)
+        minret = round(min(hist_30d), 3)
+        
+        data[i]['mom12'] = mom12
+        data[i]['mom3'] = mom3
+        data[i]['vol30'] = vol30
+        data[i]['maxret'] = maxret
+        data[i]['minret'] = minret
+
+    return data
