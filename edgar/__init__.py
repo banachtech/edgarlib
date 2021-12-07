@@ -295,12 +295,13 @@ def get_overall_rank(value):
 def get_additional_analytics(tickers):
     # print(request.data)
     if isinstance(tickers, str):
-        tickers = [tickers]
+        tickers = [tickers.strip()]
 
     # print(ticker_list)
     data = {}
 
     for i in tickers:
+        i = i.strip()
         data[i] = {}
         ticker_hist = yf.Ticker(i)
         
@@ -335,6 +336,7 @@ def get_additional_analytics(tickers):
     return data
 
 def get_quarter_details(symbol):
+    symbol = symbol.strip()
     tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     snp500_table = tables[0]
     tickers_list = snp500_table['Symbol'].to_list()
