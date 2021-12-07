@@ -1,1 +1,2 @@
-# pythonlib
+# Install the library
+1. run `pip install -e https://github.com/banachtech/edgarlib#egg=Edgar`
