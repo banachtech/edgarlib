@@ -725,4 +725,4 @@ def get_sorted_sector_comparison(ticker, variable):
         sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]][:10]
     else:
         sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker']).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]][:10]
-    return sector_dataframe_wanted.T
+    return sector_dataframe_wanted
