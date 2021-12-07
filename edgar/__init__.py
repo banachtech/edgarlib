@@ -722,7 +722,7 @@ def get_sorted_sector_comparison(ticker, variable):
     sector_dataframe = pd.read_csv(f"EdgarData/S&P500_{data_wanted[0]['Sector'].replace(' ', '_')}.csv", index_col=0)
     sector_dataframe.columns = headers
     if variable in ['Cash', 'RDSGA', 'Score']:
-        sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]][:10]
+        sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]]
     else:
-        sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker']).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]][:10]
+        sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker']).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]]
     return sector_dataframe_wanted
