@@ -272,31 +272,11 @@ def get_company_details(ticker):
     dataframe.columns = headers
 
     data_wanted = dataframe[dataframe['Ticker'] == ticker.strip()].reset_index(drop=True)
-    data_wanted_value = data_wanted[[i for i in data_wanted.columns if i not in ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK']]]
 
     if data_wanted.empty:
         return {}
-    data_wanted = data_wanted.to_dict('index')
-
-    sector_dataframe = pd.read_csv(f"EdgarData/S&P500_{data_wanted[0]['Sector'].replace(' ', '_')}.csv", index_col=0)
-    sector_dataframe.columns = headers
-    sector_data_wanted = sector_dataframe[sector_dataframe['Ticker'] == ticker.strip()].reset_index(drop=True)
-    if sector_data_wanted.empty:
-        return {}
-    sector_data_wanted = sector_data_wanted.to_dict('index')
-    sector_quantile = sector_dataframe.quantile([.1, .9]).round(3)
-    sector_quantile = sector_quantile.drop(['CIK'], axis=1)
-    sector_describe = sector_dataframe.describe().round(3)
-    sector_describe = sector_describe.drop(['CIK'], axis=1)
-    sector_stat = pd.concat([sector_quantile, sector_describe])
-    
-    data_upload = {}
-    data_upload['overall'] = dataframe[['Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']].describe().T[['mean', '50%']].T.round(3)
-    data_upload['company'] = data_wanted
-    data_upload['sector_stat'] = sector_stat
-    data_upload['company_value'] = data_wanted_value
-    
-    return data_upload
+   
+    return data_wanted
 
 def get_overall_rank(value):
     headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
@@ -503,3 +483,29 @@ def get_quarter_details(symbol):
             data[f'Q({-i})']['mom'] = 0
     data = pd.DataFrame.from_dict(data, orient='index', columns=['date', 'cash', 'stdebt', 'ltdebt', 'mkt', 'smb', 'hml', 'residuals', 'mom'])
     return data
+
+def get_sector_comparison(ticker):
+    headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
+                'Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']
+    dataframe = pd.read_csv('EdgarData/S&P500.csv', index_col=0)
+    dataframe.columns = headers
+
+    data_wanted = dataframe[dataframe['Ticker'] == ticker.strip()].reset_index(drop=True)
+
+    if data_wanted.empty:
+        return {}
+    data_wanted = data_wanted.to_dict('index')
+
+    sector_dataframe = pd.read_csv(f"EdgarData/S&P500_{data_wanted[0]['Sector'].replace(' ', '_')}.csv", index_col=0)
+    sector_dataframe.columns = headers
+    sector_data_wanted = sector_dataframe[sector_dataframe['Ticker'] == ticker.strip()].reset_index(drop=True)
+    if sector_data_wanted.empty:
+        return {}
+    sector_data_wanted = sector_data_wanted.to_dict('index')
+    sector_quantile = sector_dataframe.quantile([.1, .9]).round(3)
+    sector_quantile = sector_quantile.drop(['CIK'], axis=1)
+    sector_describe = sector_dataframe.describe().round(3)
+    sector_describe = sector_describe.drop(['CIK'], axis=1)
+    sector_stat = pd.concat([sector_quantile, sector_describe])
+    
+    return sector_stat
