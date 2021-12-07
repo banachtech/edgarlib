@@ -351,3 +351,155 @@ def get_additional_analytics(tickers):
     
     data = pd.DataFrame.from_dict(data, orient='index', columns=['mom12', 'mom3', 'vol30', 'maxret', 'minret'])
     return data
+
+def get_quarter_details(symbol):
+    tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    snp500_table = tables[0]
+    tickers_list = snp500_table['Symbol'].to_list()
+    for i in range(len(tickers_list)):
+        tickers_list[i] = tickers_list[i].replace('.', '-')
+
+    if symbol not in tickers_list:
+        return {}
+    
+    ticker = Ticker(symbol)
+    ticker_hist = yf.Ticker(symbol)
+    
+    ticker_balance_sheet_quarter = ticker.balance_sheet(frequency='q', trailing=False).T
+    ticker_balance_sheet_quarter.columns = [f"{ticker_balance_sheet_quarter.columns[i]}_{i}" for i in range(len(ticker_balance_sheet_quarter.columns))]
+    ticker_balance_sheet_quarter = ticker_balance_sheet_quarter[[ticker_balance_sheet_quarter.columns[i] for i in range(len(ticker_balance_sheet_quarter.columns)-1, -1, -1)]]
+    ticker_balance_sheet_quarter.columns = [f"{ticker_balance_sheet_quarter.columns[i]}" for i in range(len(ticker_balance_sheet_quarter.columns)-1, -1, -1)]
+    
+    data = {}
+    for i in range(len(ticker_balance_sheet_quarter.columns)):
+        data[f'Q({-i})'] = {}
+        date = ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['asOfDate']
+        data[f'Q({-i})']['date'] = (date.year, date.month, date.day)
+        try:
+            if ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['TotalAssets'] == None or np.isnan(ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['TotalAssets']):
+                total_assets_quarter = 0
+            else:
+                total_assets_quarter = ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['TotalAssets']
+        except:
+            total_assets_quarter = 0
+
+        try:
+            if ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['CashAndCashEquivalents'] == None or np.isnan(ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['CashAndCashEquivalents']):
+                cash_quarter = 0
+            else:
+                cash_quarter = ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['CashAndCashEquivalents']
+        except:
+            cash_quarter = 0
+
+        try:
+            if ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['CurrentDebt'] == None or np.isnan(ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['CurrentDebt']):
+                short_term_debt_quarter = 0
+            else:
+                short_term_debt_quarter = ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['CurrentDebt']
+        except:
+            short_term_debt_quarter = 0
+
+        try:
+            if ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['LongTermDebt'] == None or np.isnan(ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['LongTermDebt']):
+                long_term_debt_quarter = 0
+            else:
+                long_term_debt_quarter = ticker_balance_sheet_quarter[ticker_balance_sheet_quarter.columns[i]]['LongTermDebt']
+        except:
+            long_term_debt_quarter = 0
+        
+        if i == 0:
+            hist = ticker_hist.history(interval="1mo", 
+                                    end=f"{date.today().year}-{date.today().month}-01", 
+                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+            hist = hist.dropna()
+            hist = hist[['Close']]
+            hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1)
+            hist = hist.dropna()
+
+            f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
+                                                    'famafrench', 
+                                                    end=f"{date.today().year}-{date.today().month}-01", 
+                                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+
+            f_f_momentum_model = reader.DataReader('F-F_Momentum_Factor', 
+                                                    'famafrench', 
+                                                    end=f"{date.today().year}-{date.today().month}-01", 
+                                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+        else:
+            hist = ticker_hist.history(interval="1mo", 
+                                    end=f"{data[f'Q({-i})']['date'][0]}-{data[f'Q({-i})']['date'][1]}-01", 
+                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{data[f'Q({-i})']['date'][1] - 2}-01")
+            hist = hist.dropna()
+            hist = hist[['Close']]
+            hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1)
+            hist = hist.dropna()
+
+            f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
+                                                    'famafrench', 
+                                                    end=f"{data[f'Q({-i})']['date'][0]}-{data[f'Q({-i})']['date'][1]}-01", 
+                                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{data[f'Q({-i})']['date'][1] - 2}-01")
+
+            f_f_momentum_model = reader.DataReader('F-F_Momentum_Factor', 
+                                                    'famafrench', 
+                                                    end=f"{data[f'Q({-i})']['date'][0]}-{data[f'Q({-i})']['date'][1]}-01", 
+                                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{data[f'Q({-i})']['date'][1] - 2}-01")
+
+        f_f_three_factor_model = f_f_three_factor_model[0]
+        f_f_three_factor_model.index = f_f_three_factor_model.index.to_timestamp()
+
+        f_f_momentum_model = f_f_momentum_model[0]
+        f_f_momentum_model.index = f_f_momentum_model.index.to_timestamp()
+
+        f_f_models = pd.concat([f_f_three_factor_model, f_f_momentum_model], axis=1)
+        f_f_models.columns = [i.replace(' ', '') for i in f_f_models.columns]
+
+        result = pd.concat([hist, f_f_models], axis=1).dropna()
+        result['Return - RF'] = result.Return - result.RF
+
+        X_ff = result[['Mkt-RF', 'SMB', 'HML']].to_numpy()
+        y_ff = result['Return - RF'].to_numpy()
+
+        reg_ff = LinearRegression().fit(X_ff, y_ff)
+        
+        result['FF Three Factors Model Return'] = reg_ff.predict(X_ff)
+        result['Squared Error'] = (result['Return'] - result['FF Three Factors Model Return']) ** 2
+
+        X_momentum = result[['Mom']].to_numpy()
+        y_momentum = result['Return'].to_numpy()
+
+        reg_momentum = LinearRegression().fit(X_momentum, y_momentum)
+        
+        try:
+            data[f'Q({-i})']['cash'] = round(cash_quarter / total_assets_quarter * 100, 3)
+        except:
+            data[f'Q({-i})']['cash'] = 0
+        try:
+            data[f'Q({-i})']['stdebt'] = round(short_term_debt_quarter / total_assets_quarter * 100, 3)
+        except:
+            data[f'Q({-i})']['stdebt'] = 0
+        try:
+            data[f'Q({-i})']['ltdebt'] = round(long_term_debt_quarter / total_assets_quarter * 100, 3)
+        except:
+            data[f'Q({-i})']['ltdebt'] = 0
+        try:
+            data[f'Q({-i})']['mkt'] = round(reg_ff.coef_[0] * 100, 3)
+        except:
+            data[f'Q({-i})']['mkt'] = 0
+        try:
+            data[f'Q({-i})']['smb'] = round(reg_ff.coef_[1] * 100, 3)
+        except:
+            data[f'Q({-i})']['smb'] = 0
+        try:
+            data[f'Q({-i})']['hml'] = round(reg_ff.coef_[2] * 100, 3)
+        except:
+            data[f'Q({-i})']['hml'] = 0
+        try:
+            data[f'Q({-i})']['residuals'] = round(result['Squared Error'].mean() * 100, 3)
+        except:
+            data[f'Q({-i})']['residuals'] = 0
+        try:
+            data[f'Q({-i})']['mom'] = round(reg_momentum.coef_[0] * 100, 3)
+        except:
+            data[f'Q({-i})']['mom'] = 0
+
+    return data
