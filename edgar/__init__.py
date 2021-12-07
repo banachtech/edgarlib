@@ -501,5 +501,5 @@ def get_quarter_details(symbol):
             data[f'Q({-i})']['mom'] = round(reg_momentum.coef_[0] * 100, 3)
         except:
             data[f'Q({-i})']['mom'] = 0
-
+    data = pd.DataFrame.from_dict(data, orient='index', columns=['date', 'cash', 'stdebt', 'ltdebt', 'mkt', 'smb', 'hml', 'residuals', 'mom'])
     return data
