@@ -348,5 +348,6 @@ def get_additional_analytics(tickers):
         data[i]['vol30'] = vol30
         data[i]['maxret'] = maxret
         data[i]['minret'] = minret
-
+    
+    pd.DataFrame.from_dict(data, orient='index', columns=['A', 'B', 'C', 'D'])
     return data
