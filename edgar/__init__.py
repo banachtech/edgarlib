@@ -704,4 +704,25 @@ def get_report_links(ticker):
 
     return statements_dict
 
+def get_sorted_sector_comparison(ticker, variable):
+    if variable not in ['Cash', 'RDSGA', 'Score', 'ShortTermDebt', 'LongTermDebt']:
+        return {}
+    
+    headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
+                'Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']
+    dataframe = pd.read_csv('EdgarData/S&P500.csv', index_col=0)
+    dataframe.columns = headers
 
+    data_wanted = dataframe[dataframe['Ticker'] == ticker.strip()].reset_index(drop=True)
+
+    if data_wanted.empty:
+        return {}
+    data_wanted = data_wanted.to_dict('index')
+
+    sector_dataframe = pd.read_csv(f"EdgarData/S&P500_{data_wanted[0]['Sector'].replace(' ', '_')}.csv", index_col=0)
+    sector_dataframe.columns = headers
+    if variable in ['Cash', 'RDSGA', 'Score']:
+        sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]][:10]
+    else:
+        sector_dataframe_wanted = sector_dataframe.sort_values(by=[variable, 'Ticker']).reset_index(drop=True)[['Ticker', 'Security', 'Sub-Industry', variable]][:10]
+    return sector_dataframe_wanted.T
