@@ -312,11 +312,13 @@ def get_overall_rank(value):
 
 def get_additional_analytics(tickers):
     # print(request.data)
-    ticker_list = tickers.split(',')
+    if isinstance(tickers, str):
+        tickers = [tickers]
+
     # print(ticker_list)
     data = {}
 
-    for i in ticker_list:
+    for i in tickers:
         data[i] = {}
         ticker_hist = yf.Ticker(i)
         
