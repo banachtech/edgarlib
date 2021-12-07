@@ -7,6 +7,8 @@ import yfinance as yf
 from sklearn.linear_model import LinearRegression
 import time
 import os
+import requests
+import bs4 as bs
 
 def update_csv():
     tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
@@ -509,3 +511,197 @@ def get_sector_comparison(ticker):
     sector_stat = pd.concat([sector_quantile, sector_describe])
     
     return sector_stat
+
+def get_report_links(ticker):
+    def get_master_idx(year, qtr):
+        # header for requests url
+        headers = {
+                    'Host': 'www.sec.gov', 'Connection': 'close',
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36'
+                }
+        
+        # index in the master.idx file in one line (format: xxxx|xxxx|xxxx|xxxx|xxxx.txt)
+        cik, company_name, form_type, upload_date, url = 0, 1, 2, 3, 4
+        
+        download = requests.get(f'https://www.sec.gov/Archives/edgar/full-index/{year}/{qtr}/master.idx', headers=headers).content
+        
+        try:
+            download = download.decode("utf-8").split('\n') # encoding
+        except:
+            return 'Not Found!'
+
+        download_clean = download.copy() # make a copy
+        download_clean = [i.split('|') for i in download_clean if '.txt' in i] # clear the details of master.idx file
+        # extract only url with form_type of 10-Q and 10-K
+        download_clean = [i for i in download_clean if i[form_type] == '10-Q' or i[form_type] == '10-K']
+        
+        return download_clean # return either 'Not Found !' or correct list
+    
+    # Function: Getting filingsummary.xml file for the latest quarter
+    # The url of the filingsummary.xml file: https://www.sec.gov/Archives/edgar/data/xxxxxx/xxxxxxxxxxxxxxxxxx/FilingSummary.xml
+
+    def get_filingsummary_link(ticker):
+        # 'https://www.sec.gov/files/company_tickers_exchange.json': json file of US Stock Exchange listed companies' ticker
+        company_json = requests.get('https://www.sec.gov/files/company_tickers_exchange.json').json()
+
+        # make the json file to data frame and extract only the ticker's column and cik's column
+        company_dict = pd.DataFrame(company_json['data'], columns=company_json['fields'])
+        company_dict = company_dict[['cik', 'ticker']]
+        company_dict = company_dict.to_dict('records') # return back to dictionary
+        
+        # capitalized ticker
+        ticker = ticker.upper()
+        
+        # header for requests url
+        headers = {
+                    'Host': 'www.sec.gov', 'Connection': 'close',
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36'
+                }
+        
+        # initialize variable get_cik
+        get_cik = -1
+
+        # index in the master.idx file in one line (format: xxxx|xxxx|xxxx|xxxx|xxxx.txt)
+        cik, company_name, form_type, upload_date, url = 0, 1, 2, 3, 4
+        
+        # initial values
+        target = []
+        quaters = ['QTR1', 'QTR2', 'QTR3', 'QTR4']
+        result = ''
+        
+        # get today's date
+        today = date.today()
+        year = today.year
+        month = today.month
+        
+        # check the ticker
+        for i in company_dict:
+            if i['ticker'] == ticker: # check whether the ticker is in the company_dict
+                get_cik = str(i['cik'])
+
+        if get_cik == -1: # ticker doesn't exist in the company_dict
+            return 'Not Found!'
+        
+        # get the latest quarter period
+        if month in [1, 2, 3]: # 'QTR1'
+            qtr = 0
+        elif month in [4, 5, 6]: # 'QTR2'
+            qtr = 1
+        elif month in [7, 8, 9]: # 'QTR3'
+            qtr = 2
+        else: # 'QTR4'
+            qtr = 3
+            
+        while True:
+            try:
+                get_list = get_master_idx(year, quaters[qtr]) # retrieve the latest .txt file of 10-Q or 10-K file
+            except:
+                return 'Not Found!'
+            
+            # failed retrive
+            if get_list == 'Not Found!':
+                return 'Not Found!'
+
+            for item in get_list:
+                if item[cik] == get_cik:
+                    target = item
+
+            if target != []:
+                target_url = target[url] # edgar/data/xxxxxx/xxxxxxxxxx-xx-xxxxxx.txt
+                target_url_clean = target_url.replace('-', '') # edgar/data/xxxxxx/xxxxxxxxxxxxxxxxxx.txt
+                target_url_clean = target_url_clean.split('.')[0] # edgar/data/xxxxxx/xxxxxxxxxxxxxxxxxx
+                
+                to_get_html_site = f'https://www.sec.gov/Archives/{target_url}'
+                data_report = requests.get(to_get_html_site, headers=headers).content
+                data_report = data_report.decode("utf-8") 
+                data_report = data_report.split('<FILENAME>')
+                #data[1]
+                data_report = data_report[1].split('\n')[0]
+
+                result_report = f'https://www.sec.gov/Archives/{target_url_clean}/{data_report}'
+                # make url 'https://www.sec.gov/Archives/{target_url_clean}/' a json format
+                result = f'https://www.sec.gov/Archives/{target_url_clean}/index.json'
+
+                content = requests.get(result, headers=headers).json() 
+                
+                for file in content['directory']['item']:
+                    # Retrieve the filing summary file, then get the url of the file.
+                    if file['name'] == 'FilingSummary.xml': # FilingSummary.xml is standardized
+                        filing_summary_url = f"https://www.sec.gov{content['directory']['name']}/{file['name']}"
+                        # print(f'url: {filing_summary_url}')
+                        # https://www.sec.gov/Archives/edgar/data/xxxxxx/xxxxxxxxxxxxxxxxxx/FilingSummary.xml
+                break
+            else:
+                # Go back to previous quarter
+                if qtr == 0:
+                    qtr = 3
+                    year -= 1
+                else:
+                    qtr -= 1
+                continue
+        
+        # create a base url for corresponding filing folder
+        # https://www.sec.gov/Archives/edgar/data/xxxxxx/xxxxxxxxxxxxxxxxxx/
+        try: 
+            base = filing_summary_url.replace('FilingSummary.xml', '')
+        except:
+            return 'Not Found!'
+
+        # parse the content of FilingSummary.xml file
+        filing_summary = requests.get(filing_summary_url, headers=headers).content
+        filing_summary_soup = bs.BeautifulSoup(filing_summary, 'lxml')
+
+        # retrieve the 'myreports' tag, this tag is standardized, and consists of all the individual reports submitted.
+        reports = filing_summary_soup.find('myreports') 
+
+        # create a list to store all the individual reports
+        reports_list = []
+        reports_list.append(result_report)
+        # loop through each report in the 'myreports' tag but avoid the last one as this will cause an error.
+        for report in reports.find_all('report')[:-1]:
+
+            # make each of the elements in the reports dictionary
+            report_dict = {}
+            report_dict['title'] = report.shortname.text.upper() # text of the 'shortname' tag
+            report_dict['whole-title'] = report.longname.text.upper() # text of the 'longname' tag
+            report_dict['position'] = report.position.text # text of the 'position' tag
+            report_dict['url'] = f'{base}{report.htmlfilename.text}' # self-created url
+            report_dict['category'] = report.menucategory.text # text of the 'menucategory' tag
+            # all tags are standardized
+            
+            # append the dictionary to the reports.
+            reports_list.append(report_dict)
+
+        return reports_list
+    
+    tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    snp500_table = tables[0]
+    tickers_list = snp500_table['Symbol'].to_list()
+    for i in range(len(tickers_list)):
+        tickers_list[i] = tickers_list[i].replace('.', '-')
+    ticker = ticker.strip()
+    if ticker not in tickers_list:
+        return {}
+    all_reports = get_filingsummary_link(ticker)
+    # print(isinstance(all_reports, list))
+
+    if isinstance(all_reports, list) == True: # check whether the all_reports is a list
+        # create a dictionary which contains only reports categorized to 'Statements'
+        statements_dict = {}
+        
+        statements_dict['Financial Report'] = all_reports[0]
+        
+        for report_dict in all_reports[1:]: # retrieve the elements of all_reports
+            if report_dict['category'] == 'Statements':
+                if 'PARENTHETICAL' not in report_dict['title']:
+                    statements_dict[report_dict['title']] = report_dict['url'] # {'report-title': 'report-url'}
+    else:
+        return {}
+
+    return statements_dict
+
+

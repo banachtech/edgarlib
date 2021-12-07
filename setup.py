@@ -14,7 +14,9 @@ install_requires = [
   'yahooquery',
   'yfinance',
   'wheel',
-  'scikit-learn'
+  'scikit-learn',
+  'requests',
+  'beautifulsoup4'
 ]
 
 setup(
