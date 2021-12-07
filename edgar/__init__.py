@@ -307,7 +307,5 @@ def get_overall_rank(value):
         dataframe = dataframe.sort_values(by=['Score', 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sector', 'Score']]
     else:
         dataframe = dataframe.sort_values(by=['Score', 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sector', 'Score']][:int(value)]
-    result = {}
-    result['data'] = dataframe.T
-    result['row'] = len(dataframe) if int(value) >= len(dataframe) else int(value)
+    result = dataframe
     return result
