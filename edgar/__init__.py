@@ -277,7 +277,7 @@ def update_csv():
 
 def get_company_details(ticker):
     """
-    return: pandas dataframe
+    return: pandas dataframe or empty dictionary (if company is not found)
         The dataframe consists of the information of the company:
             1. Ticker
             2. Security
@@ -331,11 +331,32 @@ def get_overall_rank(value=20):
     return result
 
 def get_additional_analytics(tickers):
-    # print(request.data)
+    """
+    return: pandas dataframe or empty dictionary (if company is not found)
+        The dataframe consists of the information of the company:
+            1. 12-month momentum
+            2. 3-month momentum
+            3. 30-day annualized volatility
+            4. Maximum return
+            5. Minimum return
+    
+    input:
+        tickers (str or list): single company's ticker or list of companies' ticker.
+    """
     if isinstance(tickers, str):
         tickers = [tickers.strip()]
 
-    # print(ticker_list)
+    tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    snp500_table = tables[0]
+    tickers_list = snp500_table['Symbol'].to_list()
+    for i in range(len(tickers_list)):
+        tickers_list[i] = tickers_list[i].replace('.', '-')
+
+    for symbol in tickers:
+        symbol = symbol.upper()
+        if symbol not in tickers_list:
+            return {}
+
     data = {}
 
     for i in tickers:
