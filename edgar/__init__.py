@@ -12,7 +12,9 @@ import bs4 as bs
 
 def update_csv():
     """
-    Update the csv file!!!
+    return: csv files in folder 'EdgarData'
+    
+    You need to run this function for the first time you use this library so that the folder is downloaded in your local machine.
     """
     try:
         tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
@@ -274,6 +276,29 @@ def update_csv():
         return 0
 
 def get_company_details(ticker):
+    """
+    return: pandas dataframe
+        The dataframe consists of the information of the company:
+            1. Ticker
+            2. Security
+            3. Sector
+            4. Sub-Industry     
+            5. CIK   
+            6. Cash / Total Asset
+            7. ShortTermDebt / Total Asset
+            8. LongTermDebt / Total Asset
+            9. Wavg. of RDSGA / Total Assets
+            10. β (Mkt-Rf) (F/F 3-Factor Model)
+            11. β (Smb) (F/F 3-Factor Model)
+            12. β (Hml) (F/F 3-Factor Model)
+            13. Residuals
+            14. β (Mom) (F/F Momentum Model)
+            15. Score
+    
+    input:
+        ticker (str): company's ticker
+    """
+    ticker = ticker.upper()
     headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
                 'Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']
     dataframe = pd.read_csv('EdgarData/S&P500.csv', index_col=0)
@@ -286,7 +311,14 @@ def get_company_details(ticker):
    
     return data_wanted
 
-def get_overall_rank(value):
+def get_overall_rank(value=20):
+    """
+    return: pandas dataframe
+        The dataframe consists of the ranking of the companies in S&P 500 based on score.
+    
+    input:
+        value (int): number of rows wanted to show. Default: 20.
+    """
     headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
                 'Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']
     dataframe = pd.read_csv(f"EdgarData/S&P500.csv", index_col=0)
