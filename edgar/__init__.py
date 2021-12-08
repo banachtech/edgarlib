@@ -333,7 +333,7 @@ def get_overall_rank(value=20):
 def get_additional_analytics(tickers):
     """
     return: pandas dataframe or empty dictionary (if company is not found)
-        The dataframe consists of the information of the company:
+        The dataframe consists of the information:
             1. 12-month momentum
             2. 3-month momentum
             3. 30-day annualized volatility
@@ -395,7 +395,24 @@ def get_additional_analytics(tickers):
     return data
 
 def get_quarter_details(symbol):
+    """
+    return: pandas dataframe or empty dictionary (if company is not found)
+        The dataframe consists of the information of the company:
+            1. Date
+            2. Cash / Total Asset
+            3. ShortTermDebt / Total Asset
+            4. LongTermDebt / Total Asset
+            5. β (Mkt-Rf) (F/F 3-Factor Model)
+            6. β (Smb) (F/F 3-Factor Model)
+            7. β (Hml) (F/F 3-Factor Model)
+            8. Residuals
+            9. β (Mom) (F/F Momentum Model)
+    
+    input:
+        ticker (str): company's ticker
+    """
     symbol = symbol.strip()
+    symbol = symbol.upper()
     tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     snp500_table = tables[0]
     tickers_list = snp500_table['Symbol'].to_list()
@@ -548,6 +565,24 @@ def get_quarter_details(symbol):
     return data
 
 def get_sector_comparison(ticker):
+    """
+    return: pandas dataframe or empty dictionary (if company is not found)
+        The dataframe consists of summary statistics of the corresponding GICS Sector:
+            1. Cash / Total Asset
+            2. ShortTermDebt / Total Asset
+            3. LongTermDebt / Total Asset
+            4. Wavg. of RDSGA / Total Assets
+            5. β (Mkt-Rf) (F/F 3-Factor Model)
+            6. β (Smb) (F/F 3-Factor Model)
+            7. β (Hml) (F/F 3-Factor Model)
+            8. Residuals
+            9. β (Mom) (F/F Momentum Model)
+            10. Score
+    
+    input:
+        ticker (str): company's ticker
+    """
+    ticker = ticker.upper()
     headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
                 'Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']
     dataframe = pd.read_csv('EdgarData/S&P500.csv', index_col=0)
@@ -574,6 +609,13 @@ def get_sector_comparison(ticker):
     return sector_stat
 
 def get_report_links(ticker):
+    """
+    return: dictionary
+        The dictionary consists of the link of statements of the company for the latest quarter.
+    
+    input:
+        ticker (str): company's ticker
+    """
     def get_master_idx(year, qtr):
         # header for requests url
         headers = {
@@ -739,6 +781,7 @@ def get_report_links(ticker):
 
         return reports_list
     
+    ticker = ticker.upper()
     tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     snp500_table = tables[0]
     tickers_list = snp500_table['Symbol'].to_list()
@@ -765,7 +808,16 @@ def get_report_links(ticker):
 
     return statements_dict
 
-def get_sorted_sector_comparison(ticker, variable):
+def get_sorted_sector_comparison(ticker, variable="Score"):
+    """
+    return: pandas dataframe or empty dictionary (if company is not found)
+        The dataframe consists of top 10's ranking based on the variable:
+    
+    input:
+        ticker (str): company's ticker
+        variable (str): 'Cash', 'RDSGA', 'Score', 'ShortTermDebt', or 'LongTermDebt'
+    """
+    ticker = ticker.upper()
     if variable not in ['Cash', 'RDSGA', 'Score', 'ShortTermDebt', 'LongTermDebt']:
         return {}
     
