@@ -815,7 +815,7 @@ def get_sorted_sector_comparison(ticker, variable="Score"):
     
     input:
         ticker (str): company's ticker
-        variable (str): 'Cash', 'RDSGA', 'Score', 'ShortTermDebt', or 'LongTermDebt'
+        variable (str): 'Cash', 'RDSGA', 'Score', 'ShortTermDebt', or 'LongTermDebt'. Default: 'Score'
     """
     ticker = ticker.upper()
     if variable not in ['Cash', 'RDSGA', 'Score', 'ShortTermDebt', 'LongTermDebt']:
