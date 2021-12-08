@@ -9,6 +9,7 @@ run `pip install -e git+https://github.com/banachtech/edgarlib#egg=Edgar`
   You need to run this function for the first time you use this library so that the folder is downloaded in your local machine.
 
 `get_company_details(ticker)`
+
   return: pandas dataframe or empty dictionary (if company is not found)
   * The dataframe consists of the information of the company:
     * Ticker
@@ -26,5 +27,6 @@ run `pip install -e git+https://github.com/banachtech/edgarlib#egg=Edgar`
     * Residuals
     * β (Mom) (F/F Momentum Model)
     * Score
+
   input:
   * ticker (str): company's ticker
