@@ -352,9 +352,9 @@ def get_additional_analytics(tickers):
     for i in range(len(tickers_list)):
         tickers_list[i] = tickers_list[i].replace('.', '-')
 
-    for symbol in tickers:
-        symbol = symbol.upper()
-        if symbol not in tickers_list:
+    for i in range(len(tickers)):
+        tickers[i] = tickers[i].upper()
+        if tickers[i] not in tickers_list:
             return {}
 
     data = {}
