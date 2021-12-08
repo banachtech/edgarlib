@@ -11,6 +11,9 @@ import requests
 import bs4 as bs
 
 def update_csv():
+    """
+    Update the csv file!!!
+    """
     try:
         tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
         snp500_table = tables[0]
