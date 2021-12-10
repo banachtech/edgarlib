@@ -17,14 +17,15 @@ def update_csv():
     You need to run this function for the first time you use this library so that the folder is downloaded in your local machine.
     """
     try:
-        tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+        tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies') # get the table from wikipedia
         snp500_table = tables[0]
-        tickers_list = snp500_table[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry', 'CIK']].values.tolist()
+        tickers_list = snp500_table[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry', 'CIK']].values.tolist() # extract the data from table
         for i in range(len(tickers_list)):
-            tickers_list[i][0] = tickers_list[i][0].replace('.', '-')
+            tickers_list[i][0] = tickers_list[i][0].replace('.', '-') # change . to - : since tickers in edgar database is using -
 
         datas = []
-
+        
+        # read the FF datas for the past five years => 3 factor model and momentum model
         f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
                                                 'famafrench', 
                                                 end=f"{date.today().year}-{date.today().month}-01", 
@@ -35,29 +36,32 @@ def update_csv():
                                                 end=f"{date.today().year}-{date.today().month}-01", 
                                                 start=f"{date.today().year - 5}-{date.today().month - 2}-01")
 
+        # change the datetime to the same timestamp
         f_f_three_factor_model = f_f_three_factor_model[0]
         f_f_three_factor_model.index = f_f_three_factor_model.index.to_timestamp()
 
         f_f_momentum_model = f_f_momentum_model[0]
         f_f_momentum_model.index = f_f_momentum_model.index.to_timestamp()
 
+        # concatenate the dataframe together
         f_f_models = pd.concat([f_f_three_factor_model, f_f_momentum_model], axis=1)
         f_f_models.columns = [i.replace(' ', '') for i in f_f_models.columns]
 
         for ticker in tickers_list:
-            value = Ticker(ticker[0])
+            value = Ticker(ticker[0]) # get the info of company using yahooquery
             element = []
             element.append(ticker)
-            element = [item for sublist in element for item in sublist]
-            financials_annual = value.income_statement(frequency='a', trailing=False)
+            element = [item for sublist in element for item in sublist] # [ticker, security, gics sector, sub-industry, cik]
+            financials_annual = value.income_statement(frequency='a', trailing=False) # get the income statement, without ttm
             financials_annual = financials_annual.sort_values(by=['asOfDate'], ascending=False).T
-            financials_annual.columns = [f"{financials_annual.columns[i]}_{i}" for i in range(len(financials_annual.columns))]
-            balance_sheet_annual = value.balance_sheet(frequency='a', trailing=False).T.iloc[:, -1]
-            balance_sheet_quarter = value.balance_sheet(frequency='q', trailing=False).T.iloc[:, -1]
+            financials_annual.columns = [f"{financials_annual.columns[i]}_{i}" for i in range(len(financials_annual.columns))] # change the column name since all are the same
+            balance_sheet_annual = value.balance_sheet(frequency='a', trailing=False).T.iloc[:, -1] # get the latest annual balance sheet
+            balance_sheet_quarter = value.balance_sheet(frequency='q', trailing=False).T.iloc[:, -1] # get the latest quarter balance sheet
             
             weight_avg_RDSGA_annual = 0
             coefficient = [1, 0.75, 0.5, 0.25]
             for i in range(len(coefficient)):
+                # get the variable 'ResearchAndDevelopment', check whether it is 0 or none
                 try:
                     if financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]] == None or np.isnan(financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]]):
                         r_and_d_annual = 0 
@@ -66,6 +70,7 @@ def update_csv():
                 except:
                     r_and_d_annual = 0
 
+                # get the variable 'SellingGeneralAndAdministration', check whether it is 0 or none
                 try:
                     if financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]] == None or np.isnan(financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]]):
                         marketing_expenses_annual = 0 
@@ -76,6 +81,7 @@ def update_csv():
                 numerator = (r_and_d_annual + marketing_expenses_annual / 3) * coefficient[i]
                 weight_avg_RDSGA_annual += numerator
 
+            # get the variable 'TotalAssets', check whether it is 0 or none
             try:
                 if balance_sheet_annual['TotalAssets'] == None or np.isnan(balance_sheet_annual['TotalAssets']):
                     total_assets_annual = 0 
@@ -84,6 +90,7 @@ def update_csv():
             except:
                 total_assets_annual = 0
 
+            # get the variable 'TotalAssets', check whether it is 0 or none
             try:
                 if balance_sheet_quarter['TotalAssets'] == None or np.isnan(balance_sheet_quarter['TotalAssets']):
                     total_assets_quarter = 0 
@@ -92,6 +99,7 @@ def update_csv():
             except:
                 total_assets_quarter = 0
 
+            # get the variable 'CashAndCashEquivalents', check whether it is 0 or none
             try:
                 if balance_sheet_quarter['CashAndCashEquivalents'] == None or np.isnan(balance_sheet_quarter['CashAndCashEquivalents']):
                     cash_quarter = 0 
@@ -100,6 +108,7 @@ def update_csv():
             except:
                 cash_quarter = 0
 
+            # get the variable 'CurrentDebt', check whether it is 0 or none
             try:
                 if balance_sheet_quarter['CurrentDebt'] == None or np.isnan(balance_sheet_quarter['CurrentDebt']):
                     short_term_debt_quarter = 0 
@@ -108,6 +117,7 @@ def update_csv():
             except:
                 short_term_debt_quarter = 0
 
+            # get the variable 'LongTermDebt', check whether it is 0 or none
             try:
                 if balance_sheet_quarter['LongTermDebt'] == None or np.isnan(balance_sheet_quarter['LongTermDebt']):
                     long_term_debt_quarter = 0 
@@ -116,43 +126,48 @@ def update_csv():
             except:
                 long_term_debt_quarter = 0
             
+            # calculate the variable 'cash_per_assets', if failed then return 0
             try:
                 cash_per_assets = round(cash_quarter / total_assets_quarter * 100, 3)
             except:
                 cash_per_assets = np.nan
             element.append(cash_per_assets)
             
+            # calculate the variable 'st_debt_per_assets', if failed then return 0
             try:
                 st_debt_per_assets = round(short_term_debt_quarter / total_assets_quarter * 100, 3)
             except:
                 st_debt_per_assets = np.nan
             element.append(st_debt_per_assets)
             
+            # calculate the variable 'lt_debt_per_assets', if failed then return 0
             try:
                 lt_debt_per_assets = round(long_term_debt_quarter / total_assets_quarter * 100, 3)
             except:
                 lt_debt_per_assets = np.nan
             element.append(lt_debt_per_assets)
             
+            # calculate the variable 'weighted_avg_RDSGA_per_assets', if failed then return 0
             try:
                 weighted_avg_RDSGA_per_assets = round(weight_avg_RDSGA_annual / total_assets_annual * 100, 3)
             except:
                 weighted_avg_RDSGA_per_assets = np.nan
             element.append(weighted_avg_RDSGA_per_assets)
             
-            value_hist = yf.Ticker(ticker[0])
+            value_hist = yf.Ticker(ticker[0]) # get the price history using yfinance
             hist = value_hist.history(interval="1mo", 
                                     end=f"{date.today().year}-{date.today().month}-01", 
-                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01") # get the price history dataframe
             hist = hist.dropna()
-            hist = hist[['Close']]
-            hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1)
+            hist = hist[['Close']] # only closing price is needed
+            hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1) # calculating the return
             hist = hist.dropna()
             
             result = pd.concat([hist, f_f_models], axis=1).dropna()
 
             result['Return - RF'] = result.Return - result.RF
             
+            # linear regression to calculate betas and residual of ff 3 factor model
             X_ff = result[['Mkt-RF', 'SMB', 'HML']].to_numpy()
             y_ff = result['Return - RF'].to_numpy()
             
@@ -171,6 +186,7 @@ def update_csv():
                 residuals = np.nan
             element.append(residuals)
             
+            # linear regression to calculate beta of ff momentum model
             X_momentum = result[['Mom']].to_numpy()
             y_momentum = result['Return'].to_numpy()
 
@@ -178,6 +194,7 @@ def update_csv():
             slope_MOM = round(reg_momentum.coef_[0] * 100, 3)
             element.append(slope_MOM)
             
+            # calculate the overall score
             score = round((0.16 * cash_per_assets 
                         - 0.22 * st_debt_per_assets 
                         - 0.19 * lt_debt_per_assets 
@@ -223,10 +240,10 @@ def update_csv():
             del slope_HML
             del slope_MOM
             del element
-            time.sleep(3)
+            time.sleep(3) # 3s delay for each loop
 
         try:
-            os.makedirs('EdgarData')
+            os.makedirs('EdgarData') # create directory
         except:
             pass
         
@@ -246,15 +263,15 @@ def update_csv():
                 'Beta (MOM) (F-F Momentum Model) (%)', 
                 'Score (%)']
 
-        dataframe = pd.DataFrame(data=datas, columns=headers)
+        dataframe = pd.DataFrame(data=datas, columns=headers) # create dataframe to store the data
         dataframe = (dataframe
                     .sort_values(by=['GICS Sector', 'Ticker', 'GICS Sub-Industry'], ascending=True, na_position='first')
                     .reset_index(drop=True))
         
         dataframe = dataframe.dropna()
-        dataframe.to_csv('EdgarData/S&P500.csv')
+        dataframe.to_csv('EdgarData/S&P500.csv') # export the dataframe to csv file
         
-        sector_list = dataframe['GICS Sector'].unique().tolist()
+        sector_list = dataframe['GICS Sector'].unique().tolist() # get the GICS sectors
         
         sectors = {}
 
@@ -269,7 +286,7 @@ def update_csv():
                                         .T[['mean', 'std', '50%', 'min', 'max']]
                                         .round(3)
                                         .to_dict('index'))
-            sectors[i]['data'].to_csv(f"EdgarData/S&P500_{sectors[i]['sector'].replace(' ', '_')}.csv")
+            sectors[i]['data'].to_csv(f"EdgarData/S&P500_{sectors[i]['sector'].replace(' ', '_')}.csv") # export the sector data to csv files
         
         return 1
     except:
@@ -302,11 +319,11 @@ def get_company_details(ticker):
     headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
                 'Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']
     dataframe = pd.read_csv('EdgarData/S&P500.csv', index_col=0)
-    dataframe.columns = headers
+    dataframe.columns = headers # change the column's name to header
 
-    data_wanted = dataframe[dataframe['Ticker'] == ticker.strip()].reset_index(drop=True)
+    data_wanted = dataframe[dataframe['Ticker'] == ticker.strip()].reset_index(drop=True) # get the row with ticker input
 
-    if data_wanted.empty:
+    if data_wanted.empty: # if not found
         return {}
    
     return data_wanted
@@ -322,8 +339,8 @@ def get_overall_rank(value=20):
     headers = ['Ticker', 'Security', 'Sector', 'Sub-Industry', 'CIK', 
                 'Cash', 'ShortTermDebt', 'LongTermDebt', 'RDSGA', 'Mkt', 'Smb', 'Hml', 'Residuals', 'Mom', 'Score']
     dataframe = pd.read_csv(f"EdgarData/S&P500.csv", index_col=0)
-    dataframe.columns = headers
-    if int(value) >= len(dataframe):
+    dataframe.columns = headers # change the column name to the header
+    if int(value) >= len(dataframe): # if the value is greater than the maximum row
         dataframe = dataframe.sort_values(by=['Score', 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sector', 'Score']]
     else:
         dataframe = dataframe.sort_values(by=['Score', 'Ticker'], ascending=False).reset_index(drop=True)[['Ticker', 'Security', 'Sector', 'Score']][:int(value)]
@@ -343,14 +360,14 @@ def get_additional_analytics(tickers):
     input:
         tickers (str or list): single company's ticker or list of companies' ticker.
     """
-    if isinstance(tickers, str):
+    if isinstance(tickers, str): # if the input is a string (single company)
         tickers = [tickers.strip()]
 
     tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     snp500_table = tables[0]
     tickers_list = snp500_table['Symbol'].to_list()
     for i in range(len(tickers_list)):
-        tickers_list[i] = tickers_list[i].replace('.', '-')
+        tickers_list[i] = tickers_list[i].replace('.', '-') # get the ticker list
 
     for i in range(len(tickers)):
         tickers[i] = tickers[i].upper()
@@ -360,19 +377,19 @@ def get_additional_analytics(tickers):
     data = {}
 
     for i in tickers:
-        i = i.strip()
+        i = i.strip() # clear the spaces
         data[i] = {}
-        ticker_hist = yf.Ticker(i)
+        ticker_hist = yf.Ticker(i) # get the price history using yfinance
         
-        hist_1y = ticker_hist.history(period='1y')
+        hist_1y = ticker_hist.history(period='1y') # 1 year data
         hist_1y = hist_1y.dropna()
         hist_1y = hist_1y['Close']
 
-        hist_3mo = ticker_hist.history(period='3mo')
+        hist_3mo = ticker_hist.history(period='3mo') # 3 month data
         hist_3mo = hist_3mo.dropna()
         hist_3mo = hist_3mo['Close']
 
-        hist_30d = ticker_hist.history(period='30d')
+        hist_30d = ticker_hist.history(period='30d') # 30 day data
         hist_30d = hist_30d.dropna()
         hist_30d = hist_30d[['Close']]
         hist_30d['Return'] = hist_30d['Close'].rolling(window=2).apply(lambda x: np.log(x[1]/x[0]))
@@ -411,15 +428,15 @@ def get_quarter_details(symbol):
     input:
         ticker (str): company's ticker
     """
-    symbol = symbol.strip()
-    symbol = symbol.upper()
+    symbol = symbol.strip() # clear the spaces
+    symbol = symbol.upper() # change to uppercase
     tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     snp500_table = tables[0]
     tickers_list = snp500_table['Symbol'].to_list()
     for i in range(len(tickers_list)):
         tickers_list[i] = tickers_list[i].replace('.', '-')
 
-    if symbol not in tickers_list:
+    if symbol not in tickers_list: # if ticker is not in the ticker list, return empty
         return {}
     
     ticker = Ticker(symbol)
@@ -592,19 +609,19 @@ def get_sector_comparison(ticker):
 
     if data_wanted.empty:
         return {}
-    data_wanted = data_wanted.to_dict('index')
+    data_wanted = data_wanted.to_dict('index') # change dataframe to json data
 
-    sector_dataframe = pd.read_csv(f"EdgarData/S&P500_{data_wanted[0]['Sector'].replace(' ', '_')}.csv", index_col=0)
+    sector_dataframe = pd.read_csv(f"EdgarData/S&P500_{data_wanted[0]['Sector'].replace(' ', '_')}.csv", index_col=0) # get the info of corresponding sector
     sector_dataframe.columns = headers
     sector_data_wanted = sector_dataframe[sector_dataframe['Ticker'] == ticker.strip()].reset_index(drop=True)
     if sector_data_wanted.empty:
         return {}
     sector_data_wanted = sector_data_wanted.to_dict('index')
-    sector_quantile = sector_dataframe.quantile([.1, .9]).round(3)
+    sector_quantile = sector_dataframe.quantile([.1, .9]).round(3) # get the 10th and 90th percentile
     sector_quantile = sector_quantile.drop(['CIK'], axis=1)
-    sector_describe = sector_dataframe.describe().round(3)
+    sector_describe = sector_dataframe.describe().round(3) # get the statistics
     sector_describe = sector_describe.drop(['CIK'], axis=1)
-    sector_stat = pd.concat([sector_quantile, sector_describe])
+    sector_stat = pd.concat([sector_quantile, sector_describe]) # concatenate together into one dataframe
     
     return sector_stat
 
@@ -787,7 +804,7 @@ def get_report_links(ticker):
     tickers_list = snp500_table['Symbol'].to_list()
     for i in range(len(tickers_list)):
         tickers_list[i] = tickers_list[i].replace('.', '-')
-    ticker = ticker.strip()
+    ticker = ticker.strip() # clear the spaces
     if ticker not in tickers_list:
         return {}
     all_reports = get_filingsummary_link(ticker)
