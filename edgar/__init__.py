@@ -29,12 +29,12 @@ def update_csv():
         f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
                                                 'famafrench', 
                                                 end=f"{date.today().year}-{date.today().month}-01", 
-                                                start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+                                                start=f"{date.today().year - 5}-{11 if date.today().month - 2 == -1 else 12 if date.today().month - 2 == 0 else date.today().month - 2}-01")
 
         f_f_momentum_model = reader.DataReader('F-F_Momentum_Factor', 
                                                 'famafrench', 
                                                 end=f"{date.today().year}-{date.today().month}-01", 
-                                                start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+                                                start=f"{date.today().year - 5}-{11 if date.today().month - 2 == -1 else 12 if date.today().month - 2 == 0 else date.today().month - 2}-01")
 
         # change the datetime to the same timestamp
         f_f_three_factor_model = f_f_three_factor_model[0]
@@ -157,7 +157,7 @@ def update_csv():
             value_hist = yf.Ticker(ticker[0]) # get the price history using yfinance
             hist = value_hist.history(interval="1mo", 
                                     end=f"{date.today().year}-{date.today().month}-01", 
-                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01") # get the price history dataframe
+                                    start=f"{date.today().year - 5}-{11 if date.today().month - 2 == -1 else 12 if date.today().month - 2 == 0 else date.today().month - 2}-01") # get the price history dataframe
             hist = hist.dropna()
             hist = hist[['Close']] # only closing price is needed
             hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1) # calculating the return
@@ -487,7 +487,7 @@ def get_quarter_details(symbol):
         if i == 0:
             hist = ticker_hist.history(interval="1mo", 
                                     end=f"{date.today().year}-{date.today().month}-01", 
-                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+                                    start=f"{date.today().year - 5}-{11 if date.today().month - 2 == -1 else 12 if date.today().month - 2 == 0 else date.today().month - 2}-01")
             hist = hist.dropna()
             hist = hist[['Close']]
             hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1)
@@ -496,12 +496,12 @@ def get_quarter_details(symbol):
             f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
                                                     'famafrench', 
                                                     end=f"{date.today().year}-{date.today().month}-01", 
-                                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+                                                    start=f"{date.today().year - 5}-{11 if date.today().month - 2 == -1 else 12 if date.today().month - 2 == 0 else date.today().month - 2}-01")
 
             f_f_momentum_model = reader.DataReader('F-F_Momentum_Factor', 
                                                     'famafrench', 
                                                     end=f"{date.today().year}-{date.today().month}-01", 
-                                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+                                                    start=f"{date.today().year - 5}-{11 if date.today().month - 2 == -1 else 12 if date.today().month - 2 == 0 else date.today().month - 2}-01")
         else:
             hist = ticker_hist.history(interval="1mo", 
                                     end=f"{data[f'Q({-i})']['date'][0]}-{data[f'Q({-i})']['date'][1]}-01", 
