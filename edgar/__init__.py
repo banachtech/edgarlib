@@ -16,7 +16,7 @@ def update_csv():
     
     You need to run this function for the first time you use this library so that the folder is downloaded in your local machine.
     """
-    try:
+    # try:
         tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies') # get the table from wikipedia
         snp500_table = tables[0]
         tickers_list = snp500_table[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry', 'CIK']].values.tolist() # extract the data from table
@@ -289,8 +289,8 @@ def update_csv():
             sectors[i]['data'].to_csv(f"EdgarData/S&P500_{sectors[i]['sector'].replace(' ', '_')}.csv") # export the sector data to csv files
         
         return 1
-    except:
-        return 0
+    # except:
+    #     return 0
 
 def get_company_details(ticker):
     """
