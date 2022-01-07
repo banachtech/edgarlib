@@ -17,278 +17,278 @@ def update_csv():
     You need to run this function for the first time you use this library so that the folder is downloaded in your local machine.
     """
     # try:
-        tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies') # get the table from wikipedia
-        snp500_table = tables[0]
-        tickers_list = snp500_table[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry', 'CIK']].values.tolist() # extract the data from table
-        for i in range(len(tickers_list)):
-            tickers_list[i][0] = tickers_list[i][0].replace('.', '-') # change . to - : since tickers in edgar database is using -
-        print(tickers_list)
-        datas = []
+    tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies') # get the table from wikipedia
+    snp500_table = tables[0]
+    tickers_list = snp500_table[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry', 'CIK']].values.tolist() # extract the data from table
+    for i in range(len(tickers_list)):
+        tickers_list[i][0] = tickers_list[i][0].replace('.', '-') # change . to - : since tickers in edgar database is using -
+    print(tickers_list)
+    datas = []
+    
+    # read the FF datas for the past five years => 3 factor model and momentum model
+    f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
+                                            'famafrench', 
+                                            end=f"{date.today().year}-{date.today().month}-01", 
+                                            start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+
+    f_f_momentum_model = reader.DataReader('F-F_Momentum_Factor', 
+                                            'famafrench', 
+                                            end=f"{date.today().year}-{date.today().month}-01", 
+                                            start=f"{date.today().year - 5}-{date.today().month - 2}-01")
+
+    # change the datetime to the same timestamp
+    f_f_three_factor_model = f_f_three_factor_model[0]
+    f_f_three_factor_model.index = f_f_three_factor_model.index.to_timestamp()
+
+    f_f_momentum_model = f_f_momentum_model[0]
+    f_f_momentum_model.index = f_f_momentum_model.index.to_timestamp()
+
+    # concatenate the dataframe together
+    f_f_models = pd.concat([f_f_three_factor_model, f_f_momentum_model], axis=1)
+    f_f_models.columns = [i.replace(' ', '') for i in f_f_models.columns]
+
+    for ticker in tickers_list:
+        value = Ticker(ticker[0]) # get the info of company using yahooquery
+        element = []
+        element.append(ticker)
+        element = [item for sublist in element for item in sublist] # [ticker, security, gics sector, sub-industry, cik]
+        financials_annual = value.income_statement(frequency='a', trailing=False) # get the income statement, without ttm
+        financials_annual = financials_annual.sort_values(by=['asOfDate'], ascending=False).T
+        financials_annual.columns = [f"{financials_annual.columns[i]}_{i}" for i in range(len(financials_annual.columns))] # change the column name since all are the same
+        balance_sheet_annual = value.balance_sheet(frequency='a', trailing=False).T.iloc[:, -1] # get the latest annual balance sheet
+        balance_sheet_quarter = value.balance_sheet(frequency='q', trailing=False).T.iloc[:, -1] # get the latest quarter balance sheet
         
-        # read the FF datas for the past five years => 3 factor model and momentum model
-        f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
-                                                'famafrench', 
-                                                end=f"{date.today().year}-{date.today().month}-01", 
-                                                start=f"{date.today().year - 5}-{date.today().month - 2}-01")
-
-        f_f_momentum_model = reader.DataReader('F-F_Momentum_Factor', 
-                                                'famafrench', 
-                                                end=f"{date.today().year}-{date.today().month}-01", 
-                                                start=f"{date.today().year - 5}-{date.today().month - 2}-01")
-
-        # change the datetime to the same timestamp
-        f_f_three_factor_model = f_f_three_factor_model[0]
-        f_f_three_factor_model.index = f_f_three_factor_model.index.to_timestamp()
-
-        f_f_momentum_model = f_f_momentum_model[0]
-        f_f_momentum_model.index = f_f_momentum_model.index.to_timestamp()
-
-        # concatenate the dataframe together
-        f_f_models = pd.concat([f_f_three_factor_model, f_f_momentum_model], axis=1)
-        f_f_models.columns = [i.replace(' ', '') for i in f_f_models.columns]
-
-        for ticker in tickers_list:
-            value = Ticker(ticker[0]) # get the info of company using yahooquery
-            element = []
-            element.append(ticker)
-            element = [item for sublist in element for item in sublist] # [ticker, security, gics sector, sub-industry, cik]
-            financials_annual = value.income_statement(frequency='a', trailing=False) # get the income statement, without ttm
-            financials_annual = financials_annual.sort_values(by=['asOfDate'], ascending=False).T
-            financials_annual.columns = [f"{financials_annual.columns[i]}_{i}" for i in range(len(financials_annual.columns))] # change the column name since all are the same
-            balance_sheet_annual = value.balance_sheet(frequency='a', trailing=False).T.iloc[:, -1] # get the latest annual balance sheet
-            balance_sheet_quarter = value.balance_sheet(frequency='q', trailing=False).T.iloc[:, -1] # get the latest quarter balance sheet
-            
-            weight_avg_RDSGA_annual = 0
-            coefficient = [1, 0.75, 0.5, 0.25]
-            for i in range(len(coefficient)):
-                # get the variable 'ResearchAndDevelopment', check whether it is 0 or none
-                try:
-                    if financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]] == None or np.isnan(financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]]):
-                        r_and_d_annual = 0 
-                    else:
-                        r_and_d_annual = financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]]
-                except:
-                    r_and_d_annual = 0
-
-                # get the variable 'SellingGeneralAndAdministration', check whether it is 0 or none
-                try:
-                    if financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]] == None or np.isnan(financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]]):
-                        marketing_expenses_annual = 0 
-                    else:
-                        marketing_expenses_annual = financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]]
-                except:
-                    marketing_expenses_annual = 0
-                numerator = (r_and_d_annual + marketing_expenses_annual / 3) * coefficient[i]
-                weight_avg_RDSGA_annual += numerator
-
-            # get the variable 'TotalAssets', check whether it is 0 or none
+        weight_avg_RDSGA_annual = 0
+        coefficient = [1, 0.75, 0.5, 0.25]
+        for i in range(len(coefficient)):
+            # get the variable 'ResearchAndDevelopment', check whether it is 0 or none
             try:
-                if balance_sheet_annual['TotalAssets'] == None or np.isnan(balance_sheet_annual['TotalAssets']):
-                    total_assets_annual = 0 
+                if financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]] == None or np.isnan(financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]]):
+                    r_and_d_annual = 0 
                 else:
-                    total_assets_annual = balance_sheet_annual['TotalAssets']
+                    r_and_d_annual = financials_annual.loc['ResearchAndDevelopment', financials_annual.columns[i]]
             except:
-                total_assets_annual = 0
+                r_and_d_annual = 0
 
-            # get the variable 'TotalAssets', check whether it is 0 or none
+            # get the variable 'SellingGeneralAndAdministration', check whether it is 0 or none
             try:
-                if balance_sheet_quarter['TotalAssets'] == None or np.isnan(balance_sheet_quarter['TotalAssets']):
-                    total_assets_quarter = 0 
+                if financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]] == None or np.isnan(financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]]):
+                    marketing_expenses_annual = 0 
                 else:
-                    total_assets_quarter = balance_sheet_quarter['TotalAssets']
+                    marketing_expenses_annual = financials_annual.loc['SellingGeneralAndAdministration', financials_annual.columns[i]]
             except:
-                total_assets_quarter = 0
+                marketing_expenses_annual = 0
+            numerator = (r_and_d_annual + marketing_expenses_annual / 3) * coefficient[i]
+            weight_avg_RDSGA_annual += numerator
 
-            # get the variable 'CashAndCashEquivalents', check whether it is 0 or none
-            try:
-                if balance_sheet_quarter['CashAndCashEquivalents'] == None or np.isnan(balance_sheet_quarter['CashAndCashEquivalents']):
-                    cash_quarter = 0 
-                else:
-                    cash_quarter = balance_sheet_quarter['CashAndCashEquivalents']
-            except:
-                cash_quarter = 0
-
-            # get the variable 'CurrentDebt', check whether it is 0 or none
-            try:
-                if balance_sheet_quarter['CurrentDebt'] == None or np.isnan(balance_sheet_quarter['CurrentDebt']):
-                    short_term_debt_quarter = 0 
-                else:
-                    short_term_debt_quarter = balance_sheet_quarter['CurrentDebt']
-            except:
-                short_term_debt_quarter = 0
-
-            # get the variable 'LongTermDebt', check whether it is 0 or none
-            try:
-                if balance_sheet_quarter['LongTermDebt'] == None or np.isnan(balance_sheet_quarter['LongTermDebt']):
-                    long_term_debt_quarter = 0 
-                else:
-                    long_term_debt_quarter = balance_sheet_quarter['LongTermDebt']
-            except:
-                long_term_debt_quarter = 0
-            
-            # calculate the variable 'cash_per_assets', if failed then return 0
-            try:
-                cash_per_assets = round(cash_quarter / total_assets_quarter * 100, 3)
-            except:
-                cash_per_assets = np.nan
-            element.append(cash_per_assets)
-            
-            # calculate the variable 'st_debt_per_assets', if failed then return 0
-            try:
-                st_debt_per_assets = round(short_term_debt_quarter / total_assets_quarter * 100, 3)
-            except:
-                st_debt_per_assets = np.nan
-            element.append(st_debt_per_assets)
-            
-            # calculate the variable 'lt_debt_per_assets', if failed then return 0
-            try:
-                lt_debt_per_assets = round(long_term_debt_quarter / total_assets_quarter * 100, 3)
-            except:
-                lt_debt_per_assets = np.nan
-            element.append(lt_debt_per_assets)
-            
-            # calculate the variable 'weighted_avg_RDSGA_per_assets', if failed then return 0
-            try:
-                weighted_avg_RDSGA_per_assets = round(weight_avg_RDSGA_annual / total_assets_annual * 100, 3)
-            except:
-                weighted_avg_RDSGA_per_assets = np.nan
-            element.append(weighted_avg_RDSGA_per_assets)
-            
-            value_hist = yf.Ticker(ticker[0]) # get the price history using yfinance
-            hist = value_hist.history(interval="1mo", 
-                                    end=f"{date.today().year}-{date.today().month}-01", 
-                                    start=f"{date.today().year - 5}-{date.today().month - 2}-01") # get the price history dataframe
-            hist = hist.dropna()
-            hist = hist[['Close']] # only closing price is needed
-            hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1) # calculating the return
-            hist = hist.dropna()
-            
-            result = pd.concat([hist, f_f_models], axis=1).dropna()
-
-            result['Return - RF'] = result.Return - result.RF
-            
-            # linear regression to calculate betas and residual of ff 3 factor model
-            X_ff = result[['Mkt-RF', 'SMB', 'HML']].to_numpy()
-            y_ff = result['Return - RF'].to_numpy()
-            
-            reg_ff = LinearRegression().fit(X_ff, y_ff)
-            slope_MKT = round(reg_ff.coef_[0] * 100, 3)
-            element.append(slope_MKT)
-            slope_SMB = round(reg_ff.coef_[1] * 100, 3)
-            element.append(slope_SMB)
-            slope_HML = round(reg_ff.coef_[2] * 100, 3)
-            element.append(slope_HML)
-            result['FF Three Factors Model Return'] = reg_ff.predict(X_ff)
-            result['Squared Error'] = (result['Return'] - result['FF Three Factors Model Return']) ** 2
-            try:
-                residuals = round(result['Squared Error'].mean() * 100, 3)
-            except:
-                residuals = np.nan
-            element.append(residuals)
-            
-            # linear regression to calculate beta of ff momentum model
-            X_momentum = result[['Mom']].to_numpy()
-            y_momentum = result['Return'].to_numpy()
-
-            reg_momentum = LinearRegression().fit(X_momentum, y_momentum)
-            slope_MOM = round(reg_momentum.coef_[0] * 100, 3)
-            element.append(slope_MOM)
-            
-            # calculate the overall score
-            score = round((0.16 * cash_per_assets 
-                        - 0.22 * st_debt_per_assets 
-                        - 0.19 * lt_debt_per_assets 
-                        + 0.15 * weighted_avg_RDSGA_per_assets 
-                        + 0.17 * slope_MKT 
-                        + 0.03 * slope_SMB 
-                        + 0.02 * slope_HML 
-                        - 0.5 * residuals 
-                        - 0.05 * slope_MOM), 2)
-            element.append(score)
-            print(element)
-            datas.append(element)
-            
-            del value
-            del value_hist
-            del financials_annual
-            del balance_sheet_annual
-            del balance_sheet_quarter
-            del weight_avg_RDSGA_annual
-            del r_and_d_annual
-            del marketing_expenses_annual 
-            del numerator
-            del total_assets_annual
-            del total_assets_quarter
-            del cash_quarter
-            del short_term_debt_quarter
-            del long_term_debt_quarter
-            del cash_per_assets
-            del st_debt_per_assets
-            del lt_debt_per_assets
-            del weighted_avg_RDSGA_per_assets
-            del hist
-            del result
-            del X_ff
-            del y_ff
-            del reg_ff
-            del residuals
-            del X_momentum
-            del y_momentum
-            del reg_momentum
-            del slope_MKT
-            del slope_SMB
-            del slope_HML
-            del slope_MOM
-            del element
-            time.sleep(3) # 3s delay for each loop
-
+        # get the variable 'TotalAssets', check whether it is 0 or none
         try:
-            os.makedirs('EdgarData') # create directory
+            if balance_sheet_annual['TotalAssets'] == None or np.isnan(balance_sheet_annual['TotalAssets']):
+                total_assets_annual = 0 
+            else:
+                total_assets_annual = balance_sheet_annual['TotalAssets']
         except:
-            pass
-        
-        headers = ['Ticker', 
-                'Security', 
-                'GICS Sector', 
-                'GICS Sub-Industry', 
-                'CIK',
-                'Cash / Total Assets (MRQ) (%)', 
-                'Short-term Debt / Total Assets (MRQ) (%)', 
-                'Long-term Debt / Total Assets (MRQ) (%)',
-                'Weighted average of RDSGA / Total assets (MRY) (%)', 
-                'Beta (Mkt-RF) (F-F 3 Factors Model) (%)', 
-                'Beta (SMB) (F-F 3 Factors Model) (%)', 
-                'Beta (HML) (F-F 3 Factors Model) (%)',
-                'Residuals (F-F 3 Factors Model) (%)', 
-                'Beta (MOM) (F-F Momentum Model) (%)', 
-                'Score (%)']
+            total_assets_annual = 0
 
-        dataframe = pd.DataFrame(data=datas, columns=headers) # create dataframe to store the data
-        dataframe = (dataframe
-                    .sort_values(by=['GICS Sector', 'Ticker', 'GICS Sub-Industry'], ascending=True, na_position='first')
-                    .reset_index(drop=True))
-        
-        dataframe = dataframe.dropna()
-        dataframe.to_csv('EdgarData/S&P500.csv') # export the dataframe to csv file
-        
-        sector_list = dataframe['GICS Sector'].unique().tolist() # get the GICS sectors
-        
-        sectors = {}
+        # get the variable 'TotalAssets', check whether it is 0 or none
+        try:
+            if balance_sheet_quarter['TotalAssets'] == None or np.isnan(balance_sheet_quarter['TotalAssets']):
+                total_assets_quarter = 0 
+            else:
+                total_assets_quarter = balance_sheet_quarter['TotalAssets']
+        except:
+            total_assets_quarter = 0
 
-        for i in range(len(sector_list)):
-            sectors[i] = {}
-            sectors[i]['sector'] = sector_list[i]
-            sectors[i]['data'] = (dataframe[dataframe['GICS Sector'] == sector_list[i]]
-                                    .sort_values(by=['GICS Sub-Industry', 'Ticker'], ascending=True, na_position='first')
-                                    .reset_index(drop=True))
-            sectors[i]['statistics'] = (sectors[i]['data']
-                                        .describe()
-                                        .T[['mean', 'std', '50%', 'min', 'max']]
-                                        .round(3)
-                                        .to_dict('index'))
-            sectors[i]['data'].to_csv(f"EdgarData/S&P500_{sectors[i]['sector'].replace(' ', '_')}.csv") # export the sector data to csv files
+        # get the variable 'CashAndCashEquivalents', check whether it is 0 or none
+        try:
+            if balance_sheet_quarter['CashAndCashEquivalents'] == None or np.isnan(balance_sheet_quarter['CashAndCashEquivalents']):
+                cash_quarter = 0 
+            else:
+                cash_quarter = balance_sheet_quarter['CashAndCashEquivalents']
+        except:
+            cash_quarter = 0
+
+        # get the variable 'CurrentDebt', check whether it is 0 or none
+        try:
+            if balance_sheet_quarter['CurrentDebt'] == None or np.isnan(balance_sheet_quarter['CurrentDebt']):
+                short_term_debt_quarter = 0 
+            else:
+                short_term_debt_quarter = balance_sheet_quarter['CurrentDebt']
+        except:
+            short_term_debt_quarter = 0
+
+        # get the variable 'LongTermDebt', check whether it is 0 or none
+        try:
+            if balance_sheet_quarter['LongTermDebt'] == None or np.isnan(balance_sheet_quarter['LongTermDebt']):
+                long_term_debt_quarter = 0 
+            else:
+                long_term_debt_quarter = balance_sheet_quarter['LongTermDebt']
+        except:
+            long_term_debt_quarter = 0
         
-        return 1
+        # calculate the variable 'cash_per_assets', if failed then return 0
+        try:
+            cash_per_assets = round(cash_quarter / total_assets_quarter * 100, 3)
+        except:
+            cash_per_assets = np.nan
+        element.append(cash_per_assets)
+        
+        # calculate the variable 'st_debt_per_assets', if failed then return 0
+        try:
+            st_debt_per_assets = round(short_term_debt_quarter / total_assets_quarter * 100, 3)
+        except:
+            st_debt_per_assets = np.nan
+        element.append(st_debt_per_assets)
+        
+        # calculate the variable 'lt_debt_per_assets', if failed then return 0
+        try:
+            lt_debt_per_assets = round(long_term_debt_quarter / total_assets_quarter * 100, 3)
+        except:
+            lt_debt_per_assets = np.nan
+        element.append(lt_debt_per_assets)
+        
+        # calculate the variable 'weighted_avg_RDSGA_per_assets', if failed then return 0
+        try:
+            weighted_avg_RDSGA_per_assets = round(weight_avg_RDSGA_annual / total_assets_annual * 100, 3)
+        except:
+            weighted_avg_RDSGA_per_assets = np.nan
+        element.append(weighted_avg_RDSGA_per_assets)
+        
+        value_hist = yf.Ticker(ticker[0]) # get the price history using yfinance
+        hist = value_hist.history(interval="1mo", 
+                                end=f"{date.today().year}-{date.today().month}-01", 
+                                start=f"{date.today().year - 5}-{date.today().month - 2}-01") # get the price history dataframe
+        hist = hist.dropna()
+        hist = hist[['Close']] # only closing price is needed
+        hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1) # calculating the return
+        hist = hist.dropna()
+        
+        result = pd.concat([hist, f_f_models], axis=1).dropna()
+
+        result['Return - RF'] = result.Return - result.RF
+        
+        # linear regression to calculate betas and residual of ff 3 factor model
+        X_ff = result[['Mkt-RF', 'SMB', 'HML']].to_numpy()
+        y_ff = result['Return - RF'].to_numpy()
+        
+        reg_ff = LinearRegression().fit(X_ff, y_ff)
+        slope_MKT = round(reg_ff.coef_[0] * 100, 3)
+        element.append(slope_MKT)
+        slope_SMB = round(reg_ff.coef_[1] * 100, 3)
+        element.append(slope_SMB)
+        slope_HML = round(reg_ff.coef_[2] * 100, 3)
+        element.append(slope_HML)
+        result['FF Three Factors Model Return'] = reg_ff.predict(X_ff)
+        result['Squared Error'] = (result['Return'] - result['FF Three Factors Model Return']) ** 2
+        try:
+            residuals = round(result['Squared Error'].mean() * 100, 3)
+        except:
+            residuals = np.nan
+        element.append(residuals)
+        
+        # linear regression to calculate beta of ff momentum model
+        X_momentum = result[['Mom']].to_numpy()
+        y_momentum = result['Return'].to_numpy()
+
+        reg_momentum = LinearRegression().fit(X_momentum, y_momentum)
+        slope_MOM = round(reg_momentum.coef_[0] * 100, 3)
+        element.append(slope_MOM)
+        
+        # calculate the overall score
+        score = round((0.16 * cash_per_assets 
+                    - 0.22 * st_debt_per_assets 
+                    - 0.19 * lt_debt_per_assets 
+                    + 0.15 * weighted_avg_RDSGA_per_assets 
+                    + 0.17 * slope_MKT 
+                    + 0.03 * slope_SMB 
+                    + 0.02 * slope_HML 
+                    - 0.5 * residuals 
+                    - 0.05 * slope_MOM), 2)
+        element.append(score)
+        print(element)
+        datas.append(element)
+        
+        del value
+        del value_hist
+        del financials_annual
+        del balance_sheet_annual
+        del balance_sheet_quarter
+        del weight_avg_RDSGA_annual
+        del r_and_d_annual
+        del marketing_expenses_annual 
+        del numerator
+        del total_assets_annual
+        del total_assets_quarter
+        del cash_quarter
+        del short_term_debt_quarter
+        del long_term_debt_quarter
+        del cash_per_assets
+        del st_debt_per_assets
+        del lt_debt_per_assets
+        del weighted_avg_RDSGA_per_assets
+        del hist
+        del result
+        del X_ff
+        del y_ff
+        del reg_ff
+        del residuals
+        del X_momentum
+        del y_momentum
+        del reg_momentum
+        del slope_MKT
+        del slope_SMB
+        del slope_HML
+        del slope_MOM
+        del element
+        time.sleep(3) # 3s delay for each loop
+
+    try:
+        os.makedirs('EdgarData') # create directory
+    except:
+        pass
+    
+    headers = ['Ticker', 
+            'Security', 
+            'GICS Sector', 
+            'GICS Sub-Industry', 
+            'CIK',
+            'Cash / Total Assets (MRQ) (%)', 
+            'Short-term Debt / Total Assets (MRQ) (%)', 
+            'Long-term Debt / Total Assets (MRQ) (%)',
+            'Weighted average of RDSGA / Total assets (MRY) (%)', 
+            'Beta (Mkt-RF) (F-F 3 Factors Model) (%)', 
+            'Beta (SMB) (F-F 3 Factors Model) (%)', 
+            'Beta (HML) (F-F 3 Factors Model) (%)',
+            'Residuals (F-F 3 Factors Model) (%)', 
+            'Beta (MOM) (F-F Momentum Model) (%)', 
+            'Score (%)']
+
+    dataframe = pd.DataFrame(data=datas, columns=headers) # create dataframe to store the data
+    dataframe = (dataframe
+                .sort_values(by=['GICS Sector', 'Ticker', 'GICS Sub-Industry'], ascending=True, na_position='first')
+                .reset_index(drop=True))
+    
+    dataframe = dataframe.dropna()
+    dataframe.to_csv('EdgarData/S&P500.csv') # export the dataframe to csv file
+    
+    sector_list = dataframe['GICS Sector'].unique().tolist() # get the GICS sectors
+    
+    sectors = {}
+
+    for i in range(len(sector_list)):
+        sectors[i] = {}
+        sectors[i]['sector'] = sector_list[i]
+        sectors[i]['data'] = (dataframe[dataframe['GICS Sector'] == sector_list[i]]
+                                .sort_values(by=['GICS Sub-Industry', 'Ticker'], ascending=True, na_position='first')
+                                .reset_index(drop=True))
+        sectors[i]['statistics'] = (sectors[i]['data']
+                                    .describe()
+                                    .T[['mean', 'std', '50%', 'min', 'max']]
+                                    .round(3)
+                                    .to_dict('index'))
+        sectors[i]['data'].to_csv(f"EdgarData/S&P500_{sectors[i]['sector'].replace(' ', '_')}.csv") # export the sector data to csv files
+    
+    return 1
     # except:
     #     return 0
 
