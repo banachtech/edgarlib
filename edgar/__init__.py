@@ -505,7 +505,7 @@ def get_quarter_details(symbol):
         else:
             hist = ticker_hist.history(interval="1mo", 
                                     end=f"{data[f'Q({-i})']['date'][0]}-{data[f'Q({-i})']['date'][1]}-01", 
-                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{data[f'Q({-i})']['date'][1] - 2}-01")
+                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{11 if data[f'Q({-i})']['date'][1] - 2 == -1 else 12 if data[f'Q({-i})']['date'][1] - 2 == 0 else data[f'Q({-i})']['date'][1] - 2}-01")
             hist = hist.dropna()
             hist = hist[['Close']]
             hist['Return'] = hist['Close'].rolling(window=2).apply(lambda x: x[1]/x[0] - 1)
@@ -514,12 +514,12 @@ def get_quarter_details(symbol):
             f_f_three_factor_model = reader.DataReader('F-F_Research_Data_Factors', 
                                                     'famafrench', 
                                                     end=f"{data[f'Q({-i})']['date'][0]}-{data[f'Q({-i})']['date'][1]}-01", 
-                                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{data[f'Q({-i})']['date'][1] - 2}-01")
+                                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{11 if data[f'Q({-i})']['date'][1] - 2 == -1 else 12 if data[f'Q({-i})']['date'][1] - 2 == 0 else data[f'Q({-i})']['date'][1] - 2}-01")
 
             f_f_momentum_model = reader.DataReader('F-F_Momentum_Factor', 
                                                     'famafrench', 
                                                     end=f"{data[f'Q({-i})']['date'][0]}-{data[f'Q({-i})']['date'][1]}-01", 
-                                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{data[f'Q({-i})']['date'][1] - 2}-01")
+                                                    start=f"{data[f'Q({-i})']['date'][0] - 5}-{11 if data[f'Q({-i})']['date'][1] - 2 == -1 else 12 if data[f'Q({-i})']['date'][1] - 2 == 0 else data[f'Q({-i})']['date'][1] - 2}-01")
 
         f_f_three_factor_model = f_f_three_factor_model[0]
         f_f_three_factor_model.index = f_f_three_factor_model.index.to_timestamp()
