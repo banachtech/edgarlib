@@ -22,7 +22,7 @@ def update_csv():
         tickers_list = snp500_table[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry', 'CIK']].values.tolist() # extract the data from table
         for i in range(len(tickers_list)):
             tickers_list[i][0] = tickers_list[i][0].replace('.', '-') # change . to - : since tickers in edgar database is using -
-
+        print(tickers_list)
         datas = []
         
         # read the FF datas for the past five years => 3 factor model and momentum model
